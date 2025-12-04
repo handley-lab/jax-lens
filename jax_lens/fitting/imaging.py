@@ -213,9 +213,13 @@ def log_likelihood_chi2_only(
 def convolve_image(
     image: jnp.ndarray,
     psf: jnp.ndarray,
+    padding: str = "edge",
 ) -> jnp.ndarray:
     """
     Convolve an image with a PSF kernel.
+
+    Handles edge effects by padding the image before convolution to avoid
+    dark artifacts at the boundaries where light may extend beyond the grid.
 
     Parameters
     ----------
@@ -223,13 +227,37 @@ def convolve_image(
         Input image (2D array)
     psf : jnp.ndarray
         PSF kernel (2D array, should be normalized to sum to 1)
+    padding : str
+        Padding mode for edges: 'edge' (default, replicate edge values),
+        'zero' (zero padding, original behavior), or 'reflect'.
 
     Returns
     -------
     jnp.ndarray
         Convolved image (same size as input)
     """
-    return convolve2d(image, psf, mode="same")
+    if padding == "zero":
+        # Original behavior - can cause edge darkening
+        return convolve2d(image, psf, mode="same")
+
+    # Calculate padding size based on PSF dimensions
+    pad_y = psf.shape[0] // 2
+    pad_x = psf.shape[1] // 2
+
+    # Apply padding
+    if padding == "edge":
+        padded = jnp.pad(image, ((pad_y, pad_y), (pad_x, pad_x)), mode="edge")
+    elif padding == "reflect":
+        padded = jnp.pad(image, ((pad_y, pad_y), (pad_x, pad_x)), mode="reflect")
+    else:
+        raise ValueError(f"Unknown padding mode: {padding}")
+
+    # Convolve the padded image
+    convolved = convolve2d(padded, psf, mode="same")
+
+    # Trim back to original size
+    result = convolved[pad_y:pad_y + image.shape[0], pad_x:pad_x + image.shape[1]]
+    return result
 
 
 def convolve_image_fft(

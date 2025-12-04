@@ -302,6 +302,47 @@ class TestMassProfiles:
         assert jnp.isfinite(gradient)
         assert gradient > 0
 
+    def test_external_shear_divergence_zero(self):
+        """External shear should have zero divergence (pure shear, no convergence)."""
+        # Test on a grid
+        grid = jnp.array([
+            [0.5, 0.3], [-0.2, 0.8], [1.0, -0.5], [-0.7, -0.3]
+        ])
+
+        gamma_1, gamma_2 = 0.1, 0.05
+
+        deflections = mass.external_shear_deflections(
+            grid=grid,
+            gamma_1=gamma_1,
+            gamma_2=gamma_2,
+        )
+
+        # For pure shear: div(alpha) = d(alpha_x)/dx + d(alpha_y)/dy = 0
+        # With alpha_x = gamma_1*x + gamma_2*y and alpha_y = -gamma_1*y + gamma_2*x
+        # d(alpha_x)/dx = gamma_1, d(alpha_y)/dy = -gamma_1
+        # divergence = gamma_1 + (-gamma_1) = 0
+
+        # We verify this analytically: the implementation must give:
+        # alpha_y = -gamma_1 * y + gamma_2 * x
+        # alpha_x = gamma_1 * x + gamma_2 * y
+        expected_alpha_y = -gamma_1 * grid[:, 0] + gamma_2 * grid[:, 1]
+        expected_alpha_x = gamma_1 * grid[:, 1] + gamma_2 * grid[:, 0]
+
+        assert jnp.allclose(deflections[:, 0], expected_alpha_y, rtol=1e-5)
+        assert jnp.allclose(deflections[:, 1], expected_alpha_x, rtol=1e-5)
+
+    def test_external_shear_convergence_zero(self):
+        """External shear should have zero convergence."""
+        grid = jnp.array([[0.5, 0.3], [1.0, 0.0], [-0.5, 0.5]])
+
+        kappa = mass.external_shear_convergence(
+            grid=grid,
+            gamma_1=0.1,
+            gamma_2=0.05,
+        )
+
+        assert jnp.allclose(kappa, 0.0)
+
 
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])

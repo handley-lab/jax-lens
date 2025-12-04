@@ -22,10 +22,14 @@ class Cosmology(NamedTuple):
     Om0: float = 0.3089  # Matter density parameter
     Ob0: float = 0.0486  # Baryon density parameter
     Tcmb0: float = 2.725  # CMB temperature in K
+    n_integration_steps: int = 100  # Integration steps for distance calculations
 
 
 # Default Planck 2015 cosmology
 PLANCK15 = Cosmology()
+
+# High precision cosmology for sensitive calculations (e.g., high-z sources)
+PLANCK15_HIGHRES = Cosmology(n_integration_steps=500)
 
 
 def _hubble_parameter(z: float, cosmo: Cosmology = PLANCK15) -> float:
@@ -59,7 +63,7 @@ def _comoving_distance_integrand(z: float, cosmo: Cosmology = PLANCK15) -> float
 def comoving_distance(
     z: float,
     cosmo: Cosmology = PLANCK15,
-    n_steps: int = 100,
+    n_steps: int = None,
 ) -> float:
     """
     Compute the comoving distance to redshift z.
@@ -72,14 +76,17 @@ def comoving_distance(
         Redshift
     cosmo : Cosmology
         Cosmological parameters
-    n_steps : int
-        Number of integration steps
+    n_steps : int, optional
+        Number of integration steps. If None, uses cosmo.n_integration_steps.
 
     Returns
     -------
     float
         Comoving distance in Mpc
     """
+    if n_steps is None:
+        n_steps = cosmo.n_integration_steps
+
     # Simple trapezoidal integration
     z_arr = jnp.linspace(0.0, z, n_steps)
     integrand = jnp.vectorize(lambda zi: _comoving_distance_integrand(zi, cosmo))(z_arr)
@@ -90,7 +97,7 @@ def comoving_distance(
 def angular_diameter_distance(
     z: float,
     cosmo: Cosmology = PLANCK15,
-    n_steps: int = 100,
+    n_steps: int = None,
 ) -> float:
     """
     Compute the angular diameter distance to redshift z.
@@ -103,14 +110,17 @@ def angular_diameter_distance(
         Redshift
     cosmo : Cosmology
         Cosmological parameters
-    n_steps : int
-        Number of integration steps
+    n_steps : int, optional
+        Number of integration steps. If None, uses cosmo.n_integration_steps.
 
     Returns
     -------
     float
         Angular diameter distance in Mpc
     """
+    if n_steps is None:
+        n_steps = cosmo.n_integration_steps
+
     d_c = comoving_distance(z, cosmo, n_steps)
     return d_c / (1.0 + z)
 
@@ -119,7 +129,7 @@ def angular_diameter_distance_z1z2(
     z1: float,
     z2: float,
     cosmo: Cosmology = PLANCK15,
-    n_steps: int = 100,
+    n_steps: int = None,
 ) -> float:
     """
     Compute the angular diameter distance between two redshifts z1 and z2 (z1 < z2).
@@ -136,14 +146,17 @@ def angular_diameter_distance_z1z2(
         Higher redshift
     cosmo : Cosmology
         Cosmological parameters
-    n_steps : int
-        Number of integration steps
+    n_steps : int, optional
+        Number of integration steps. If None, uses cosmo.n_integration_steps.
 
     Returns
     -------
     float
         Angular diameter distance between z1 and z2 in Mpc
     """
+    if n_steps is None:
+        n_steps = cosmo.n_integration_steps
+
     d_c1 = comoving_distance(z1, cosmo, n_steps)
     d_c2 = comoving_distance(z2, cosmo, n_steps)
 
@@ -155,7 +168,7 @@ def scaling_factor(
     z_source: float,
     z_final: float,
     cosmo: Cosmology = PLANCK15,
-    n_steps: int = 100,
+    n_steps: int = None,
 ) -> float:
     """
     Compute the multi-plane lensing scaling factor.
@@ -182,14 +195,17 @@ def scaling_factor(
         Redshift of the final (most distant) plane
     cosmo : Cosmology
         Cosmological parameters
-    n_steps : int
-        Number of integration steps
+    n_steps : int, optional
+        Number of integration steps. If None, uses cosmo.n_integration_steps.
 
     Returns
     -------
     float
         Scaling factor for deflection angles
     """
+    if n_steps is None:
+        n_steps = cosmo.n_integration_steps
+
     d_ls = angular_diameter_distance_z1z2(z_lens, z_source, cosmo, n_steps)
     d_s = angular_diameter_distance(z_source, cosmo, n_steps)
 
@@ -214,7 +230,7 @@ def critical_surface_density(
     z_lens: float,
     z_source: float,
     cosmo: Cosmology = PLANCK15,
-    n_steps: int = 100,
+    n_steps: int = None,
 ) -> float:
     """
     Compute the critical surface density for lensing.
@@ -229,14 +245,17 @@ def critical_surface_density(
         Redshift of the source
     cosmo : Cosmology
         Cosmological parameters
-    n_steps : int
-        Number of integration steps
+    n_steps : int, optional
+        Number of integration steps. If None, uses cosmo.n_integration_steps.
 
     Returns
     -------
     float
         Critical surface density in M_sun / Mpc^2
     """
+    if n_steps is None:
+        n_steps = cosmo.n_integration_steps
+
     # Constants
     c = 299792.458  # km/s
     G = 4.302e-9  # Mpc * (km/s)^2 / M_sun
@@ -256,7 +275,7 @@ def time_delay_distance(
     z_lens: float,
     z_source: float,
     cosmo: Cosmology = PLANCK15,
-    n_steps: int = 100,
+    n_steps: int = None,
 ) -> float:
     """
     Compute the time delay distance.
@@ -271,14 +290,17 @@ def time_delay_distance(
         Redshift of the source
     cosmo : Cosmology
         Cosmological parameters
-    n_steps : int
-        Number of integration steps
+    n_steps : int, optional
+        Number of integration steps. If None, uses cosmo.n_integration_steps.
 
     Returns
     -------
     float
         Time delay distance in Mpc
     """
+    if n_steps is None:
+        n_steps = cosmo.n_integration_steps
+
     d_l = angular_diameter_distance(z_lens, cosmo, n_steps)
     d_s = angular_diameter_distance(z_source, cosmo, n_steps)
     d_ls = angular_diameter_distance_z1z2(z_lens, z_source, cosmo, n_steps)
@@ -296,7 +318,7 @@ def time_delay_distance(
 def precompute_distances(
     redshifts: jnp.ndarray,
     cosmo: Cosmology = PLANCK15,
-    n_steps: int = 100,
+    n_steps: int = None,
 ) -> dict:
     """
     Pre-compute angular diameter distances for a set of redshifts.
@@ -309,8 +331,8 @@ def precompute_distances(
         Array of redshifts
     cosmo : Cosmology
         Cosmological parameters
-    n_steps : int
-        Number of integration steps
+    n_steps : int, optional
+        Number of integration steps. If None, uses cosmo.n_integration_steps.
 
     Returns
     -------
@@ -320,6 +342,9 @@ def precompute_distances(
         - 'd_a_matrix': Matrix of D_A(z_i, z_j) for all pairs
         - 'redshifts': The input redshifts
     """
+    if n_steps is None:
+        n_steps = cosmo.n_integration_steps
+
     n_z = len(redshifts)
 
     # Compute D_A to each redshift

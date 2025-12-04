@@ -280,6 +280,81 @@ def sie_convergence(
 
 
 # =============================================================================
+# External Shear
+# =============================================================================
+
+
+def external_shear_deflections(
+    grid: jnp.ndarray,
+    gamma_1: float,
+    gamma_2: float,
+) -> jnp.ndarray:
+    """
+    Compute deflection angles from external shear.
+
+    External shear accounts for tidal forces from nearby massive structures
+    (galaxy clusters, neighboring galaxies, etc.) that are not explicitly modeled.
+
+    The shear is parameterized by two components:
+    - gamma_1: Shear along the x-axis (stretches along x, compresses along y)
+    - gamma_2: Shear at 45 degrees
+
+    Parameters
+    ----------
+    grid : jnp.ndarray
+        Grid of (y, x) coordinates with shape (..., 2) in arcseconds
+    gamma_1 : float
+        First shear component (dimensionless)
+    gamma_2 : float
+        Second shear component (dimensionless)
+
+    Returns
+    -------
+    jnp.ndarray
+        Deflection angles (alpha_y, alpha_x) at each grid point, shape (..., 2)
+    """
+    y = grid[..., 0]
+    x = grid[..., 1]
+
+    # Shear deflection angles from potential psi = (gamma_1/2)(x^2 - y^2) + gamma_2 * x * y
+    # Taking gradient: alpha = nabla(psi)
+    # alpha_x = d(psi)/dx = gamma_1 * x + gamma_2 * y
+    # alpha_y = d(psi)/dy = -gamma_1 * y + gamma_2 * x
+    # This ensures div(alpha) = 0 (pure shear, no convergence)
+    alpha_y = -gamma_1 * y + gamma_2 * x
+    alpha_x = gamma_1 * x + gamma_2 * y
+
+    return jnp.stack([alpha_y, alpha_x], axis=-1)
+
+
+def external_shear_convergence(
+    grid: jnp.ndarray,
+    gamma_1: float,
+    gamma_2: float,
+) -> jnp.ndarray:
+    """
+    Compute convergence for external shear.
+
+    External shear has zero convergence (it's a pure shear field).
+
+    Parameters
+    ----------
+    grid : jnp.ndarray
+        Grid of (y, x) coordinates with shape (..., 2) in arcseconds
+    gamma_1 : float
+        First shear component (dimensionless)
+    gamma_2 : float
+        Second shear component (dimensionless)
+
+    Returns
+    -------
+    jnp.ndarray
+        Convergence at each grid point (all zeros)
+    """
+    return jnp.zeros(grid.shape[:-1])
+
+
+# =============================================================================
 # Navarro-Frenk-White (NFW) Profile
 # =============================================================================
 
@@ -459,18 +534,19 @@ def nfw_convergence(
 # =============================================================================
 
 
-def power_law_deflections(
+def spherical_power_law_deflections(
     grid: jnp.ndarray,
     centre: jnp.ndarray,
     einstein_radius: float,
     slope: float,
-    axis_ratio: float = 1.0,
-    angle: float = 0.0,
 ) -> jnp.ndarray:
     """
-    Compute deflection angles for a power-law mass profile.
+    Compute deflection angles for a SPHERICAL power-law mass profile.
 
-    For slope = 2.0, this reduces to SIE.
+    Note: This is a spherical approximation. For elliptical power-law profiles,
+    complex numerical integration is required (not yet implemented).
+
+    For slope = 2.0, this reduces to SIS (not SIE).
 
     Parameters
     ----------
@@ -482,17 +558,12 @@ def power_law_deflections(
         Einstein radius in arcseconds
     slope : float
         Power law slope (gamma), typical range 1.5-2.5
-    axis_ratio : float
-        Ratio of semi-minor to semi-major axis (b/a), default 1.0
-    angle : float
-        Position angle in radians, default 0.0
 
     Returns
     -------
     jnp.ndarray
         Deflection angles (alpha_y, alpha_x) at each grid point, shape (..., 2)
     """
-    # Spherical power law for simplicity
     shifted = grid - centre
     r = jnp.sqrt(shifted[..., 0] ** 2 + shifted[..., 1] ** 2)
     r = jnp.maximum(r, 1e-12)
@@ -526,7 +597,7 @@ def evaluate_deflections(
     Parameters
     ----------
     profile_type : str
-        One of 'sis', 'sie', 'nfw', 'power_law'
+        One of 'sis', 'sie', 'nfw', 'spherical_power_law', 'shear'
     grid : jnp.ndarray
         Grid of (y, x) coordinates
     params : dict
@@ -560,14 +631,18 @@ def evaluate_deflections(
             axis_ratio=params.get("axis_ratio", 1.0),
             angle=params.get("angle", 0.0),
         )
-    elif profile_type == "power_law":
-        return power_law_deflections(
+    elif profile_type == "spherical_power_law":
+        return spherical_power_law_deflections(
             grid=grid,
             centre=params["centre"],
             einstein_radius=params["einstein_radius"],
             slope=params["slope"],
-            axis_ratio=params.get("axis_ratio", 1.0),
-            angle=params.get("angle", 0.0),
+        )
+    elif profile_type == "shear":
+        return external_shear_deflections(
+            grid=grid,
+            gamma_1=params["gamma_1"],
+            gamma_2=params["gamma_2"],
         )
     else:
         raise ValueError(f"Unknown mass profile type: {profile_type}")
@@ -584,7 +659,7 @@ def evaluate_convergence(
     Parameters
     ----------
     profile_type : str
-        One of 'sis', 'sie', 'nfw'
+        One of 'sis', 'sie', 'nfw', 'shear'
     grid : jnp.ndarray
         Grid of (y, x) coordinates
     params : dict
@@ -617,6 +692,12 @@ def evaluate_convergence(
             scale_radius=params["scale_radius"],
             axis_ratio=params.get("axis_ratio", 1.0),
             angle=params.get("angle", 0.0),
+        )
+    elif profile_type == "shear":
+        return external_shear_convergence(
+            grid=grid,
+            gamma_1=params["gamma_1"],
+            gamma_2=params["gamma_2"],
         )
     else:
         raise ValueError(f"Unknown mass profile type: {profile_type}")
