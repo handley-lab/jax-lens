@@ -1,3 +1,4 @@
+# Python
 __pycache__/
 *.pyc
 *.pyo
@@ -6,3 +7,14 @@ __pycache__/
 dist/
 build/
 .eggs/
+
+# PyAutoLens reference implementations (cloned for comparison)
+PyAutoLens/
+PyAutoArray/
+PyAutoGalaxy/
+PyAutoFit/
+
+# Logs and temp files
+*.log
+.mcp_*/
+pyautolens_jax_batching_analysis.md

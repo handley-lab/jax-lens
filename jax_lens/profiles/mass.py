@@ -213,7 +213,11 @@ def sie_deflections(
     # Handle the circular case (q=1) separately to avoid division by zero
 
     # Factor for deflection magnitude
-    factor = einstein_radius * jnp.sqrt(q) / f
+    # Using PyAutoLens convention with rescaled Einstein radius:
+    # For isothermal (slope=2): einstein_radius_rescaled = einstein_radius / (1 + q)
+    # factor = 2 * einstein_radius_rescaled * q / f
+    einstein_radius_rescaled = einstein_radius / (1.0 + q)
+    factor = 2.0 * einstein_radius_rescaled * q / f
 
     # Deflections in rotated frame
     alpha_x_rot = factor * jnp.arctan(f * x_rot / psi)
