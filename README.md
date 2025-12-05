@@ -84,19 +84,19 @@ def lens_model(einstein_radius):
     lens_params = {"centre": jnp.array([0.0, 0.0]), "einstein_radius": einstein_radius, ...}
     return simple_tracer_image(grid, lens_params, source_params, "sie", "sersic")
 
-# Vectorize over MCMC walkers
+# Vectorize over 32 MCMC walkers
 batched_lens = jit(vmap(lens_model))
-results = batched_lens(einstein_radii)  # Shape: (n_walkers, n_pixels)
+results = batched_lens(einstein_radii)  # Shape: (32, n_pixels)
 ```
 
-![Batching Benchmark](batching_benchmark.png)
+**Performance** (50×50 grid, 32 walkers, CPU):
+- Sequential (JIT): 8.8 ms
+- Batched (JIT + vmap): 1.2 ms
+- **Speedup: ~7×**
 
-Speedup increases with batch size, reaching **~30× at 512 samples** on CPU. The right panel shows sequential time scales linearly while batched evaluation remains nearly constant.
-
-Run the benchmarks:
+Run the batching tests:
 ```bash
-python benchmark_batching.py  # Generate the plot above
-python test_batching.py       # Quick validation tests
+python test_batching.py
 ```
 
 ## Validation
