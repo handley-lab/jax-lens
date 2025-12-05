@@ -84,19 +84,9 @@ def lens_model(einstein_radius):
     lens_params = {"centre": jnp.array([0.0, 0.0]), "einstein_radius": einstein_radius, ...}
     return simple_tracer_image(grid, lens_params, source_params, "sie", "sersic")
 
-# Vectorize over 32 MCMC walkers
+# Vectorize over MCMC walkers
 batched_lens = jit(vmap(lens_model))
-results = batched_lens(einstein_radii)  # Shape: (32, n_pixels)
-```
-
-**Performance** (50×50 grid, 32 walkers, CPU):
-- Sequential (JIT): 8.8 ms
-- Batched (JIT + vmap): 1.2 ms
-- **Speedup: ~7×**
-
-Run the batching tests:
-```bash
-python test_batching.py
+results = batched_lens(einstein_radii)  # Shape: (n_walkers, n_pixels)
 ```
 
 ## Validation
