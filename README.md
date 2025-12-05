@@ -72,6 +72,33 @@ python examples/demo_lensing.py
 
 This generates the Einstein ring figure shown at the top of this README.
 
+## Batched Inference
+
+The key advantage of jax_lens is efficient batched evaluation via `vmap`:
+
+```python
+from jax import vmap, jit
+
+# Define lens model for single parameter set
+def lens_model(einstein_radius):
+    lens_params = {"centre": jnp.array([0.0, 0.0]), "einstein_radius": einstein_radius, ...}
+    return simple_tracer_image(grid, lens_params, source_params, "sie", "sersic")
+
+# Vectorize over 32 MCMC walkers
+batched_lens = jit(vmap(lens_model))
+results = batched_lens(einstein_radii)  # Shape: (32, n_pixels)
+```
+
+**Performance** (50×50 grid, 32 walkers, CPU):
+- Sequential (JIT): 8.8 ms
+- Batched (JIT + vmap): 1.2 ms
+- **Speedup: ~7×**
+
+Run the batching tests:
+```bash
+python test_batching.py
+```
+
 ## Validation
 
 The implementation has been validated pixel-by-pixel against PyAutoLens:
